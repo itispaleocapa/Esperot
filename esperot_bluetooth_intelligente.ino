@@ -1,3 +1,4 @@
+//QUESTA VERSIONE FUNZIONA COL SERIALE
 
 #define MOTORLATCH 12
 #define MOTORCLK 4
@@ -18,46 +19,169 @@
 #define MOTOR3_PWM 6
 #define MOTOR4_PWM 5
 
-#define FORWARD 1
+#define FORWARD 1//valori funzione di base
 #define BACKWARD 2
 #define BRAKE 3
 
-const short TRIG=A0;
-const short ECHO=A1;
+#define RIGHT 4//valori per switch
+#define LEFT 5
 
-void setup()
-{
+#include <SoftwareSerial.h>//bluetooth
+#define BT_TX_PIN A3
+#define BT_RX_PIN A4
+SoftwareSerial bt = SoftwareSerial(BT_RX_PIN, BT_TX_PIN);
+
+#define TRIG A0
+#define ECHO A1
+
+short dir1;//direzione
+short dir2;
+double b;
+
+void setup(){
   pinMode(TRIG, OUTPUT);
   pinMode(ECHO, INPUT);
+  
+  pinMode(BT_RX_PIN, INPUT);
+  pinMode(BT_TX_PIN, OUTPUT);
+ 
   Serial.begin(9600);
-  Serial.println("Simple Motor Shield sketch");
+  bt.begin(9600);
+  
+  Serial.println("Set up completed");
+  
+  dir1=BRAKE;//direzione
+  dir2=BRAKE;
 }
 
 
-void loop()
-{
+void loop() { 
+ while(bt.available()>0){
+   switch (bt.read()){
+    case 65://avanti
+    case 97://sia 65 che 97 per maiuscola e minuscola
+      dir1=FORWARD;
+    break;
+    case 68://destra
+    case 100:
+      dir1=RIGHT;
+    break;
+    case 73://indietro
+    case 105:
+      dir1=BACKWARD;
+    break;
+    case 83://sinistra
+    case 115:
+      dir1=LEFT;
+    break;
+    case 85:
+      for(short i=0;i<18;i++){
+        bt.read();
+        delay(10);
+      }
+      avvio();  
+      dir1=BRAKE;
+      dir2=BRAKE;
+    break;
+    default:
+      dir1=BRAKE;
+    break;  
+  }
+  
+  while(bt.available()<1){
+    switch (dir1){
+      case FORWARD://avanti
+        if(dir1!=dir2 && dist()>26){
+          motor(1, BRAKE, 0);
+          motor(4, BRAKE, 0);
+          delay(100);
+          motor(1, FORWARD, 255);
+          motor(4, FORWARD, 255);
+          dir2=FORWARD;
+        }
+        b=dist();
+        Serial.println(b);
+        if(b<15 && b>0 && (b<3.75 || b > 3.90) ){
+          avvio();
+          dir1=BRAKE;
+          dir2=BRAKE;
+        }
+      break;
+      case RIGHT://destra
+        if(dir1!=dir2){
+          motor(1, BRAKE, 0);
+          motor(4, BRAKE, 0);
+          delay(100);
+          motor(1, FORWARD, 255);
+          motor(4, BACKWARD, 255);
+          dir2=RIGHT;
+        }
+      break;
+      case BACKWARD://indietro
+        if(dir1!=dir2){
+          motor(1, BRAKE, 0);
+          motor(4, BRAKE, 0);
+          delay(100);
+          motor(1, BACKWARD, 255);
+          motor(4, BACKWARD, 255);
+          dir2=BACKWARD;
+        }
+      break;
+      case LEFT://sinistra
+        if(dir1!=dir2){
+          motor(1, BRAKE, 0);
+          motor(4, BRAKE, 0);
+          delay(100);
+          motor(1, BACKWARD, 255);
+          motor(4, FORWARD, 255);
+          dir2=LEFT;
+        }
+      break;
+      case BRAKE://sinistra
+        motor(1, BRAKE, 0);
+        motor(4, BRAKE, 0);
+        dir2=BRAKE;
+      break;
+    }
+   }
+ }
+}
+
+
+
+void avvio(){
+    motor(1, BRAKE, 0);
+    motor(4, BRAKE, 0);
+    delay(50);
+    motor(1, BACKWARD, 255);
+    motor(4, FORWARD, 255);
+    delay(200);
+    motor(1, BRAKE, 0);
+    motor(4, BRAKE, 0);
+    delay(50);
+    motor(1, FORWARD, 255);
+    motor(4, BACKWARD, 255);
+    delay(400);
+    motor(1, BRAKE, 0);
+    motor(4, BRAKE, 0);
+    delay(50);
+    motor(1, BACKWARD, 255);
+    motor(4, FORWARD, 255);
+    delay(200);
+    motor(1, BRAKE, 0);
+    motor(4, BRAKE, 0);
+}  
+  
+double dist(){
   digitalWrite(TRIG, LOW);
   delayMicroseconds(2);
   digitalWrite(TRIG, HIGH);
   delayMicroseconds(10);
   digitalWrite(TRIG, LOW);
-   
-  unsigned long dis=pulseIn(ECHO, HIGH)/29.1/2;
-  
-  if(dis<30){
-    motor(1, BRAKE, 0);
-    motor(2, BRAKE, 0);
-    delay(500);
-    motor(1, BACKWARD, 255);
-    motor(2, FORWARD, 255);
-    delay(500);
-    motor(1, BRAKE, 0);
-    motor(2, BRAKE, 0);
-  }else{
-    motor(1, FORWARD, 255);
-    motor(2, FORWARD, 255);
-  }
+  double a=pulseIn(ECHO, HIGH)/29.1/2;
+  return a;
 }
+  
 
 
 // Initializing
@@ -69,8 +193,6 @@ void loop()
 // that's okay for the Motor Shield, it stays off.
 // Using analogWrite() without pinMode() is valid.
 //
-
-
 // ---------------------------------
 // motor
 //
